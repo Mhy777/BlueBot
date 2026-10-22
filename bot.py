@@ -233,7 +233,8 @@ async def main():
 
     while True:
         try:
-            async for msg in client.iter_messages(source_group, limit=10):
+            recent_messages = [msg async for msg in client.iter_messages(source_group, limit=10)]
+            for msg in reversed(recent_messages):
                 await process_message(msg)
         except Exception as e:
             print(f"Error fetching messages: {e}")
