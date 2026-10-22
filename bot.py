@@ -26,19 +26,26 @@ load_dotenv()
 ALI_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY")
 ALI_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET")
 ALI_TRACKING_ID = os.getenv("ALIEXPRESS_TRACKING_ID")
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
+api_id_raw = os.getenv("API_ID", "").strip()
+api_hash = os.getenv("API_HASH", "").strip()
+if not api_id_raw or not api_hash:
+    raise RuntimeError("Configure API_ID e API_HASH no arquivo .env antes de iniciar.")
+api_id = int(api_id_raw)
 
 # Required for headless execution environments (Linux servers)
 os.environ["DISPLAY"] = ":1"
 
 # Telegram source and destination groups
-SOURCE_USERNAME = ""        # Telegram source group/channel
-DESTINATION_USERNAME = ""   # Telegram destination group for reposting
+SOURCE_USERNAME = os.getenv("SOURCE_USERNAME", "").strip()
+DESTINATION_USERNAME = os.getenv("DESTINATION_USERNAME", "").strip()
+POLL_SECONDS = max(2, int(os.getenv("POLL_SECONDS", "5")))
+if not SOURCE_USERNAME or not DESTINATION_USERNAME:
+    raise RuntimeError("Configure SOURCE_USERNAME e DESTINATION_USERNAME no .env.")
 
 # Filter keywords to remove from messages
 filters = [
-    ""
+    item.strip() for item in os.getenv("MESSAGE_FILTERS", "").split("|")
+    if item.strip()
 ]
 
 # Normalize filters to avoid accent or spacing mismatches
@@ -65,8 +72,8 @@ async def process_message(msg):
     """
     global last_id, destination_group
 
-    # Skip already processed message
-    if msg.id == last_id:
+    # Process each message ID only once; polling uses newest messages first.
+    if last_id is not None and msg.id <= last_id:
         return
     last_id = msg.id
 
@@ -187,7 +194,7 @@ async def process_message(msg):
 
         # Send message to WhatsApp via local API
         try:
-            resp = requests.post("http://localhost:4000/send", json=payload)
+            resp = requests.post(os.getenv("WHATSAPP_SEND_URL", "http://127.0.0.1:4000/send"), json=payload, timeout=20)
             if resp.status_code == 200:
                 print("✅ Message sent to WhatsApp!")
             else:
@@ -221,15 +228,16 @@ async def main():
     global destination_group
     await client.start()
     destination_group = await client.get_entity(DESTINATION_USERNAME)
-    print("🤖 Bot monitoring via polling...")
+    source_group = await client.get_entity(SOURCE_USERNAME)
+    print(f"🤖 Monitorando {SOURCE_USERNAME} -> {DESTINATION_USERNAME}; intervalo={POLL_SECONDS}s")
 
     while True:
         try:
-            async for msg in client.iter_messages(SOURCE_USERNAME, limit=1):
+            async for msg in client.iter_messages(source_group, limit=10):
                 await process_message(msg)
         except Exception as e:
             print(f"Error fetching messages: {e}")
-        await asyncio.sleep(5)
+        await asyncio.sleep(POLL_SECONDS)
 
 
 # ==============================
