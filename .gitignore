@@ -21,3 +21,17 @@ __pycache__/
 
 # Arquivos de ambiente
 .env
+
+# Browser profiles, sessions, cookies and local data (never commit)
+Affiliates/User Data/
+Affiliates/user-data/
+user-data/
+**/User Data/
+**/user-data/
+Session/
+**/Session/
+*.session
+*.session-journal
+.wwebjs_auth/
+.wwebjs_cache/
+temp_telegram_image.jpg
